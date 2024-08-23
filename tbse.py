@@ -20,12 +20,11 @@ portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
 LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMIXES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ------------------------
-
 
 
 TBSE is a very simple simulation of automated execution traders
@@ -56,9 +55,8 @@ from datetime import datetime
 import config
 from tbse_customer_orders import customer_orders
 from tbse_exchange import Exchange
-from tbse_trader_agents import TraderGiveaway, TraderShaver, TraderSniper, \
-    TraderZic, TraderZip, TraderAa, TraderGdx
-
+from tbse_trader_agents import TraderGiveaway, TraderAA, \
+    TraderZIC, TraderZip, TraderMIX, TraderRaForest, TraderRandom, TraderHerd
 
 # Adapted from original BSE code
 def trade_stats(expid, traders, dumpfile):
@@ -70,24 +68,25 @@ def trade_stats(expid, traders, dumpfile):
     trader_types = {}
     for t in traders:
         trader_type = traders[t].ttype
-        t_time1 = 0
-        t_time2 = 0
-        if trader_type in trader_types:
-            t_balance = trader_types[trader_type]['balance_sum'] + traders[t].balance
-            t_trades = trader_types[trader_type]['trades_sum'] + traders[t].n_trades
-            if traders[t].last_quote is not None:
-                t_time1 = trader_types[trader_type]['time1'] + traders[t].times[0] / traders[t].times[2]
-                t_time2 = trader_types[trader_type]['time2'] + traders[t].times[1] / traders[t].times[3]
-            n = trader_types[trader_type]['n'] + 1
-        else:
-            t_balance = traders[t].balance
-            if traders[t].last_quote is not None:
-                t_time1 = traders[t].times[0] / traders[t].times[2]
-                t_time2 = traders[t].times[1] / traders[t].times[3]
-            n = 1
-            t_trades = traders[t].n_trades
-        trader_types[trader_type] = {'n': n, 'balance_sum': t_balance, 'trades_sum': t_trades, 'time1': t_time1,
-                                     'time2': t_time2}
+        if trader_type not in ['Random', 'Herd']:  # Exclude noise traders
+            t_time1 = 0
+            t_time2 = 0
+            if trader_type in trader_types:
+                t_balance = trader_types[trader_type]['balance_sum'] + traders[t].balance
+                t_trades = trader_types[trader_type]['trades_sum'] + traders[t].n_trades
+                if traders[t].last_quote is not None:
+                    t_time1 = trader_types[trader_type]['time1'] + traders[t].times[0] / traders[t].times[2]
+                    t_time2 = trader_types[trader_type]['time2'] + traders[t].times[1] / traders[t].times[3]
+                n = trader_types[trader_type]['n'] + 1
+            else:
+                t_balance = traders[t].balance
+                if traders[t].last_quote is not None:
+                    t_time1 = traders[t].times[0] / traders[t].times[2]
+                    t_time2 = traders[t].times[1] / traders[t].times[3]
+                n = 1
+                t_trades = traders[t].n_trades
+            trader_types[trader_type] = {'n': n, 'balance_sum': t_balance, 'trades_sum': t_trades, 'time1': t_time1,
+                                         'time2': t_time2}
 
     dumpfile.write(f"{expid}")
     for trader_type in sorted(list(trader_types.keys())):
@@ -118,17 +117,20 @@ def populate_market(trader_spec, traders, shuffle, verbose):
         if robot_type == 'GVWY':
             return TraderGiveaway('GVWY', name, 0.00, 0)
         if robot_type == 'ZIC':
-            return TraderZic('ZIC', name, 0.00, 0)
-        if robot_type == 'SHVR':
-            return TraderShaver('SHVR', name, 0.00, 0)
-        if robot_type == 'SNPR':
-            return TraderSniper('SNPR', name, 0.00, 0)
+            return TraderZIC('ZIC', name, 0.00, 0)
+        if robot_type == 'AA':
+            return TraderAA('AA', name, 0.00, 0)
         if robot_type == 'ZIP':
             return TraderZip('ZIP', name, 0.00, 0)
-        if robot_type == 'AA':
-            return TraderAa('AA', name, 0.00, 0)
-        if robot_type == 'GDX':
-            return TraderGdx('GDX', name, 0.00, 0)
+        if robot_type == 'MIX':
+            return TraderMIX('MIX', name, 0.00, 0)
+        if robot_type == 'RaForest':
+            return TraderRaForest('RaForest', name, 0.00, 0)
+        if robot_type == 'Random':
+            return TraderRandom('Random', name, 0.00, 0)
+        if robot_type == 'Herd':
+            return TraderHerd('Herd', name, 0.00, 0)
+
         sys.exit(f'FATAL: don\'t know robot type {robot_type}\n')
 
     def shuffle_traders(ttype_char, n, trader_list):
@@ -221,7 +223,7 @@ def run_exchange(
     required_batch_number = 1
     last_batch_time = 0
 
-    while start_event.isSet():        
+    while start_event.is_set():
         
         virtual_time = (time.time() - start_time) * (virtual_end / sess_length)
 
@@ -317,7 +319,7 @@ def run_trader(
     demand_curve = []
     supply_curve = []
 
-    while start_event.isSet():
+    while start_event.is_set():
         time.sleep(0.01)
         #print("in sleep 1")
         virtual_time = (time.time() - start_time) * (virtual_end / sess_length)
@@ -335,8 +337,11 @@ def run_trader(
             time1 = time.time()
             trader.respond(virtual_time,p_eq ,q_eq, demand_curve,supply_curve,lob,trades,respond_verbose) #Need to pass list of trades here
             time2 = time.time()
-            trader.times[1] += time2 - time1
+            response_time = time2 - time1
+            trader.times[1] += response_time
             trader.times[3] += 1
+            # print(
+            #     f"Trader {trader.tid} ({trader.ttype}) after respond. Response time: {response_time:.8f}")
 
         lob = exchange.publish_lob(virtual_time, False)
         time1 = time.time()
@@ -397,11 +402,12 @@ def market_session(
     trader_threads = []
     trader_qs = []
     trader_stats = populate_market(trader_spec, traders, True, verbose)
-
+    # print(f"Starting thread creation loop. Total traders: {len(traders)}")
     # create threads and queues for traders
     for i in range(0, len(traders)):
         trader_qs.append(queue.Queue())
         tid = list(traders.keys())[i]
+        # print(f"Creating thread for trader {tid} of type {traders[tid].ttype}")
         trader_threads.append(threading.Thread(target=run_trader, args=(
             traders[tid],
             exchange,
@@ -413,6 +419,9 @@ def market_session(
             virtual_end,
             respond_verbose,
             bookkeep_verbose)))
+    #     print(f"Thread created for trader {tid}")
+    # print("Thread creation loop completed")
+    # print(f"All trader threads created. Thread count: {len(trader_threads)}")
 
     ex_thread = threading.Thread(
         target=run_exchange, args=(
@@ -526,7 +535,7 @@ def schedule_offset_function(t):
     :param t: Time at which we are retrieving the offset
     :return: The offset
     """
-    print(t)
+    # print(t)
     pi2 = math.pi * 2
     c = math.pi * 3000
     wavelength = t / c
@@ -617,10 +626,12 @@ if __name__ == "__main__":
 
     NUM_ZIC = config.numZIC
     NUM_ZIP = config.numZIP
-    NUM_GDX = config.numGDX
-    NUM_AA = config.numAA
+    NUM_RaForest = config.numRaForest
+    NUM_MIX = config.numMIX
     NUM_GVWY = config.numGVWY
-    NUM_SHVR = config.numSHVR
+    NUM_AA = config.numAA
+    NUM_RANDOM = config.numRandom
+    NUM_Herd = config.numHerd
 
     NUM_OF_ARGS = len(sys.argv)
     if NUM_OF_ARGS == 1:
@@ -632,10 +643,13 @@ if __name__ == "__main__":
         try:
             NUM_ZIC = int(sys.argv[1])
             NUM_ZIP = int(sys.argv[2])
-            NUM_GDX = int(sys.argv[3])
-            NUM_AA = int(sys.argv[4])
+            NUM_RaForest = int(sys.argv[3])
+            NUM_MIX = int(sys.argv[4])
             NUM_GVWY = int(sys.argv[5])
-            NUM_SHVR = int(sys.argv[6])
+            NUM_AA = int(sys.argv[6])
+            NUM_RANDOM = int(sys.argv[7])
+            NUM_Herd = int(sys.argv[8])
+
         except ValueError:
             print("ERROR: Invalid trader schedule. Please enter six integer values.")
             sys.exit()
@@ -644,30 +658,30 @@ if __name__ == "__main__":
         print("Options for running TBSE:")
         print("	$ python3 tbse.py  ---  Run using trader schedule from config.")
         print(" $ python3 tbse.py <string>.csv  ---  Enter name of csv file describing a series of trader schedules.")
-        print(" $ python3 tbse.py <int> <int> <int> <int> <int> <int>  ---  Enter 6 integer values representing trader \
+        print(" $ python3 tbse.py <int> <int> <int> <int> <int> <int> <int> ---  Enter 7 integer values representing trader \
         schedule.")
         sys.exit()
     # pylint: disable=too-many-boolean-expressions
-    if NUM_ZIC < 0 or NUM_ZIP < 0 or NUM_GDX < 0 or NUM_AA < 0 or NUM_GVWY < 0 or NUM_SHVR < 0:
+    if NUM_ZIC < 0 or NUM_ZIP < 0 or NUM_RaForest < 0 or NUM_MIX < 0 or NUM_GVWY < 0 or NUM_AA < 0:
         print("ERROR: Invalid trader schedule. All input integers should be positive.")
         sys.exit()
 
     # This section of code allows for the same order and trader schedules
     # to be tested config.numTrials times.
-
+    #
     if USE_CONFIG or USE_COMMAND_LINE:
-
         order_sched = get_order_schedule()
-
         buyers_spec = [('ZIC', NUM_ZIC), ('ZIP', NUM_ZIP),
-                       ('GDX', NUM_GDX), ('AA', NUM_AA),
-                       ('GVWY', NUM_GVWY), ('SHVR', NUM_SHVR)]
+                       ('RaForest', NUM_RaForest), ('MIX', NUM_MIX),
+                       ('GVWY', NUM_GVWY), ('AA', NUM_AA), ('Random', NUM_RANDOM),
+                       ('Herd', NUM_Herd)]
 
         sellers_spec = buyers_spec
         traders_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 
-        file_name = f"{str(NUM_ZIC).zfill(2)}-{str(NUM_ZIP).zfill(2)}-{str(NUM_GDX).zfill(2)}-" \
-                    f"{str(NUM_AA).zfill(2)}-{str(NUM_GVWY).zfill(2)}-{str(NUM_SHVR).zfill(2)}.csv"
+        file_name = f"{str(NUM_ZIC).zfill(2)}-{str(NUM_ZIP).zfill(2)}-{str(NUM_RaForest).zfill(2)}-" \
+                    f"{str(NUM_MIX).zfill(2)}-{str(NUM_GVWY).zfill(2)}-{str(NUM_AA).zfill(2)}.csv"
+
         with open(file_name, 'w', encoding="utf-8") as tdump:
 
             trader_count = 0
@@ -689,6 +703,9 @@ if __name__ == "__main__":
                 trial_id = f'trial{str(trial).zfill(7)}'
                 start_session_event = threading.Event()
                 try:
+                    # print(f"Trader count before creating threads: {trader_count}")
+                    # print(f"Trader specification:{traders_spec}")
+                    # print(f"Starting market session for trial {trial_id}")
                     NUM_THREADS = market_session(
                         trial_id,
                         config.sessionLength,
@@ -697,8 +714,19 @@ if __name__ == "__main__":
                         order_sched,
                         start_session_event,
                         False)
-                    
-                    #print(f"There are {NUM_THREADS} number of threads")
+                    # print(f"Market session completed. Threads created: {NUM_THREADS}")
+                    # print(f"Expected threads: {trader_count + 2}")
+                    # print("Waiting for market session to start...")
+                    # print("Market session started.")
+                    # print("Trader specification:")
+                    # for ttype, count in traders_spec['buyers']:
+                    #     print(f"{ttype}: {count}")
+
+                    # print(f"Trader count: {trader_count}")
+                    # print(f"Total threads expected: {trader_count + 2}")
+                    # print(f"Actual thread count: {NUM_THREADS}")
+                    # print(f"Active threads: {threading.active_count()}")
+                    # print(f"Thread names: {[t.name for t in threading.enumerate()]}")
 
                     if NUM_THREADS != trader_count + 2: #traders + exchange + market thread
                         trial = trial - 1
@@ -717,16 +745,6 @@ if __name__ == "__main__":
                     print("In sleep 4")
                 tdump.flush()
                 trial = trial + 1
-
-    # To use this section of code run TBSE with 'python3 tbse.py <csv>'
-    # and have a CSV file with name <string>.csv with a list of values
-    # representing the number of each trader type present in the
-    # market you wish to run. The order is:
-    # 				ZIC,ZIP,GDX,AA,GVWY,SHVR
-    # So an example entry would be: 5,5,0,0,5,5
-    # which would be 5 ZIC traders, 5 ZIP traders, 5 Giveaway traders and
-    # 5 Shaver traders. To have different buyer and seller specs modifications
-    # would be needed.
 
     elif USE_CSV:
         server = sys.argv[1]
@@ -748,10 +766,13 @@ if __name__ == "__main__":
             try:
                 NUM_ZIC = int(ratio[0])
                 NUM_ZIP = int(ratio[1])
-                NUM_GDX = int(ratio[2])
-                NUM_AA = int(ratio[3])
+                NUM_RaForest = int(ratio[2])
+                NUM_MIX = int(ratio[3])
                 NUM_GVWY = int(ratio[4])
-                NUM_SHVR = int(ratio[5])
+                NUM_AA = int(ratio[5])
+                NUM_RANDOM = int(ratio[6])
+                NUM_Herd = int(ratio[7])
+
             except ValueError:
                 print("ERROR: Invalid trader schedule. Please enter six, comma-separated, integer values. Skipping "
                       "this trader schedule.")
@@ -760,29 +781,27 @@ if __name__ == "__main__":
                 print("ERROR: Unknown input error. Skipping this trader schedule." + str(e))
                 continue
             # pylint: disable=too-many-boolean-expressions
-            if NUM_ZIC < 0 or NUM_ZIP < 0 or NUM_GDX < 0 or NUM_AA < 0 or NUM_GVWY < 0 or NUM_SHVR < 0:
+            if NUM_ZIC < 0 or NUM_ZIP < 0 or NUM_RaForest < 0 or NUM_MIX < 0 or NUM_GVWY < 0 or NUM_AA < 0:
                 print("ERROR: Invalid trader schedule. All input integers should be positive. Skipping this trader"
                       " schedule.")
                 continue
-
-            #putting results from CSV files instead results folder:
+            #putting results_noise from CSV files instead results_noise folder:
             #change results_folder = results_<combination number>
             results_folder = "test_results"
             if not os.path.exists(results_folder):
                 os.makedirs(results_folder)
 
-            file_name = f"{results_folder}/{str(NUM_ZIC).zfill(2)}-{str(NUM_ZIP).zfill(2)}-{str(NUM_GDX).zfill(2)}-" \
-                        f"{str(NUM_AA).zfill(2)}-{str(NUM_GVWY).zfill(2)}-{str(NUM_SHVR).zfill(2)}.csv"
+            file_name = f"{results_folder}/{str(NUM_ZIC).zfill(2)}-{str(NUM_ZIP).zfill(2)}-{str(NUM_RaForest).zfill(2)}-"\
+                        f"{str(NUM_MIX).zfill(2)}-{str(NUM_GVWY).zfill(2)}-{str(NUM_AA).zfill(2)}.csv"
             
             with open(file_name, 'w', encoding="utf-8") as tdump:
 
                 for _ in range(0, config.numSchedulesPerRatio):
-
                     order_sched = get_order_schedule()
-
                     buyers_spec = [('ZIC', NUM_ZIC), ('ZIP', NUM_ZIP),
-                                   ('GDX', NUM_GDX), ('AA', NUM_AA),
-                                   ('GVWY', NUM_GVWY), ('SHVR', NUM_SHVR)]
+                                   ('RaForest', NUM_RaForest), ('MIX', NUM_MIX),
+                                   ('GVWY', NUM_GVWY), ('AA', NUM_AA), ('Random', NUM_RANDOM),
+                                   ('Herd', NUM_Herd)]
 
                     sellers_spec = buyers_spec
                     traders_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
