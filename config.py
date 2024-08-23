@@ -1,9 +1,8 @@
 """TBSE Config File"""
 # pylint: skip-file
-
 # BFBSE 
 
-batch_interval = 10 #interval between batches in number of seconds. 
+batch_interval = 0.25  # interval between batches in number of seconds.
 
 # General
 sessionLength = 1  # Length of session in seconds.
@@ -15,19 +14,27 @@ start_time = 0.0
 end_time = 600.0
 
 # Trader Schedule
-# Define number of each algorithm used one side of exchange (buyers or sellers).
-# Same values will be used to define other side of exchange (buyers = sellers).
+# Define number of each algorithm used one side of exchange (buyers or sellers)
+# Same values will be used to define other side of exchange (buyers = sellers)
+# Input sequence follows the same
 numZIC = 0
-numZIP = 5
-numGDX = 0
+numZIP = 0
+numRaForest = 5
+numMIX = 5
+numGVWY = 0
 numAA = 0
-numGVWY = 5
-numSHVR = 0
+
+# Noise Traders
+numRandom = 5
+numHerd = 5
 
 # Order Schedule
-useOffset = False  # Use an offset function to vary equilibrium price, this is disabled if useInputFile = True #causes multiple prints sometimes?
-useInputFile = False  # Use an input file to define order schedule (e.g. Real World Trading data)
-input_file = "RWD/IBM-310817.csv" # Path to real world data input file
+useOffset = True  # Use an offset function to vary equilibrium price, this is disabled if useInputFile = True #causes
+# multiple prints sometimes?
+useInputFile = True  # Use an input file to define order schedule (e.g. Real World Trading data)
+enable_market_shocks = True  # Master switch for all market shocks
+
+input_file = "RWD/IBM-310817.csv"  # Path to real world data input file
 stepmode = 'random'  # Valid values: 'fixed', 'jittered', 'random'
 timemode = 'periodic'  # Valid values: 'periodic', 'drip-fixed', 'drip-jitter', 'drip-poisson'
 interval = 30  # Virtual seconds between new set of customer orders being generated. #changed to 250 from 30
@@ -55,13 +62,24 @@ demand = {
 }
 
 # For single schedule: using config trader schedule, or command-line trader schedule.
-numTrials = 10
+numTrials = 50
 
 # For multiple schedules: using input csv file. 
 numSchedulesPerRatio = 10  # Number of schedules per ratio of traders in csv file.
 numTrialsPerSchedule = 100  # Number of trails per schedule.
 symmetric = True  # Should range of supply = range of demand?
 
+# Micro-market shock configuration
+micro_shock_probability = 0.01  # Trigger probability
+micro_shock_order_count_min = 1  # Minimum number of orders added to
+micro_shock_order_count_max = 5  # Maximum number of orders added to
+
+# Macro-market shock configuration
+macro_shock_probability = 0.0001  # Trigger probability
+macro_shock_duration_min = 10  # Min Duration
+macro_shock_duration_max = 30  # Max Duration
+macro_shock_intensity_min = 0.01  # Min intensity
+macro_shock_intensity_max = 0.05  # Max intensity
 
 # Function for parsing config values.
 def parse_config():
@@ -81,8 +99,8 @@ def parse_config():
     if not isinstance(end_time, float):
         print("CONFIG ERROR: end_time must be a float.")
         valid = False
-    if not (isinstance(numZIC, int) and isinstance(numAA, int) and isinstance(numGDX, int) and
-            isinstance(numGVWY, int) and isinstance(numSHVR, int) and isinstance(numZIP, int)):
+    if not (isinstance(numZIC, int) and isinstance(numMIX, int) and isinstance(numRaForest, int) and
+            isinstance(numGVWY, int) and isinstance(numAA, int) and isinstance(numZIP, int)):
         print("CONFIG ERROR: Trader schedule values must be integer.")
         valid = False
     if not isinstance(useOffset, bool):
@@ -130,7 +148,7 @@ def parse_config():
     if end_time <= start_time:
         print("CONFIG ERROR: end_time must be greater than start_time")
         valid = False
-    if numAA < 0 or numGDX < 0 or numGVWY < 0 or numSHVR < 0 or numZIC < 0 or numZIP < 0:
+    if numMIX < 0 or numRaForest < 0 or numGVWY < 0 or numAA < 0 or numZIC < 0 or numZIP < 0:
         print("CONFIG ERROR: All trader schedule values must be greater than or equal to 0.")
         valid = False
     if stepmode not in ['fixed', 'jittered', 'random']:
