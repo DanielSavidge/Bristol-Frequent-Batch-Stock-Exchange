@@ -1,0 +1,57 @@
+Dynamic market
+batch interval = 0.05
+Total number of wins for each trading algorithm:
+{'ZIP': 37888, 'MIX': 28212, 'GVWY': 27798, 'AA': 24179, 'RaForest': 12287, 'ZIC': 4636}
+
+Number of algorithms beaten by each trading algorithm:
+{'ZIP': 5, 'GVWY': 3, 'AA': 3, 'MIX': 3, 'RaForest': 1, 'ZIC': 0}
+
+Number of algorithms dominated by each trading algorithm:
+{'RaForest': ['ZIC'], 'GVWY': ['RaForest', 'ZIC', 'MIX'], 'AA': ['RaForest', 'ZIC', 'GVWY'], 'MIX': ['RaForest', 'ZIC', 'AA'], 'ZIC': [], 'ZIP': ['ZIC', 'GVWY', 'AA', 'MIX', 'RaForest']}
+
+batch interval = 0.1
+
+Total number of wins for each trading algorithm:
+{'ZIP': 36469, 'MIX': 30861, 'GVWY': 30170, 'AA': 21674, 'RaForest': 11790, 'ZIC': 4036}
+
+Number of algorithms beaten by each trading algorithm:
+{'ZIP': 5, 'GVWY': 4, 'MIX': 3, 'AA': 2, 'RaForest': 1, 'ZIC': 0}
+
+Number of algorithms dominated by each trading algorithm:
+{'RaForest': ['ZIC'], 'GVWY': ['AA', 'RaForest', 'ZIC', 'MIX'], 'AA': ['RaForest', 'ZIC'], 'MIX': ['RaForest', 'ZIC', 'AA'], 'ZIC': [], 'ZIP': ['ZIC', 'GVWY', 'AA', 'MIX', 'RaForest']}
+
+
+batch interval = 0.25
+
+Total number of wins for each trading algorithm:
+{'ZIP': 34809, 'MIX': 32657, 'GVWY': 32387, 'AA': 19906, 'RaForest': 11992, 'ZIC': 3249}
+
+Number of algorithms beaten by each trading algorithm:
+{'ZIP': 5, 'GVWY': 4, 'MIX': 3, 'AA': 2, 'RaForest': 1, 'ZIC': 0}
+
+Number of algorithms dominated by each trading algorithm:
+{'RaForest': ['ZIC'], 'GVWY': ['AA', 'RaForest', 'ZIC', 'MIX'], 'AA': ['RaForest', 'ZIC'], 'MIX': ['RaForest', 'ZIC', 'AA'], 'ZIC': [], 'ZIP': ['ZIC', 'GVWY', 'AA', 'MIX', 'RaForest']}
+
+
+batch interval = 0.5
+
+Total number of wins for each trading algorithm:
+{'GVWY': 34583, 'MIX': 33945, 'ZIP': 33740, 'AA': 18026, 'RaForest': 12078, 'ZIC': 2628}
+
+Number of algorithms beaten by each trading algorithm:
+{'GVWY': 5, 'MIX': 4, 'ZIP': 3, 'AA': 2, 'RaForest': 1, 'ZIC': 0}
+
+Number of algorithms dominated by each trading algorithm:
+{'RaForest': ['ZIC'], 'GVWY': ['ZIP', 'AA', 'RaForest', 'ZIC', 'MIX'], 'AA': ['RaForest', 'ZIC'], 'MIX': ['RaForest', 'ZIP', 'ZIC', 'AA'], 'ZIC': [], 'ZIP': ['ZIC', 'AA', 'RaForest']}
+
+
+batch interval = 2
+
+Total number of wins for each trading algorithm:
+{'MIX': 37423, 'GVWY': 37284, 'ZIP': 30067, 'AA': 16473, 'RaForest': 12785, 'ZIC': 968}
+
+Number of algorithms beaten by each trading algorithm:
+{'GVWY': 5, 'MIX': 4, 'ZIP': 3, 'AA': 2, 'RaForest': 1, 'ZIC': 0}
+
+Number of algorithms dominated by each trading algorithm:
+{'RaForest': ['ZIC'], 'GVWY': ['ZIP', 'AA', 'RaForest', 'ZIC', 'MIX'], 'AA': ['RaForest', 'ZIC'], 'MIX': ['RaForest', 'ZIP', 'ZIC', 'AA'], 'ZIC': [], 'ZIP': ['ZIC', 'AA', 'RaForest']}
