@@ -121,8 +121,9 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
         new_order_price = sys_min_check(sys_max_check(new_order_price))
         return new_order_price
 
+    # Define the shocks
     def generate_micro_shock_orders(t_name, order_type, base_price, time, current_coid):
-        shock_order_count = random.randint(config.micro_shock_order_count_min, config.micro_shock_order_count_max)
+        shock_order_count = random.randint(config.micro_shock_order_count_min, config.micro_shock_order_count_max)   # as the config
         shock_orders = []
         for _ in range(shock_order_count):
             # Generate orders that deviate slightly from the base price
@@ -261,7 +262,7 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
             issue_time = time + issue_times[t]
             t_name = f'B{str(t).zfill(2)}'
             order_price = get_order_price(t, sched, sched_end, n_buyers, mode, issue_time)
-
+            # check if market shocks are available
             if enable_market_shocks:
                 # Macro shocks
                 if customer_orders.macro_shock_active:
@@ -294,6 +295,7 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
             issue_time = time + issue_times[t]
             t_name = f'S{str(t).zfill(2)}'
             order_price = get_order_price(t, sched, sched_end, n_sellers, mode, issue_time)
+            # Check if market shocks are available
             if enable_market_shocks:
                 # Macro shocks
                 if customer_orders.macro_shock_active:
