@@ -121,7 +121,7 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
         new_order_price = sys_min_check(sys_max_check(new_order_price))
         return new_order_price
 
-    # Define the shocks
+    # Define the micro shocks
     def generate_micro_shock_orders(t_name, order_type, base_price, time, current_coid):
         shock_order_count = random.randint(config.micro_shock_order_count_min, config.micro_shock_order_count_max)   # as the config
         shock_orders = []
@@ -138,8 +138,9 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
         price_change_ratio = random.uniform(-0.005, 0.005)
         shock_price = int(base_price * (1 + price_change_ratio))
         if order_type == 'Bid':
+            # Ensure that the new price is not higher than the original price
             shock_price = min(shock_price, base_price)
-        else:  # Ask
+        else:  # Ensure that the new price will not be lower than the original price
             shock_price = max(shock_price, base_price)
         return max(TBSE_SYS_MIN_PRICE, min(shock_price, TBSE_SYS_MAX_PRICE))
 
@@ -226,6 +227,7 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
 
     enable_market_shocks = config.enable_market_shocks
     if enable_market_shocks:
+        # Initial state of Market Shocks
         if not hasattr(customer_orders, 'macro_shock_active'):
             customer_orders.macro_shock_active = False
             customer_orders.macro_shock_remaining = 0

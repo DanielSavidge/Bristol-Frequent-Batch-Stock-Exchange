@@ -445,18 +445,19 @@ class TraderZip(Trader):
         self.prev_best_ask_p = lob_best_ask_p
         self.prev_best_ask_q = lob_best_ask_q
 
-
+# Predict the equilibrium price
 # pylint: disable=too-many-instance-attributes
 class TraderRaForest(Trader):
     def __init__(self, ttype, tid, balance, time):
         super().__init__(ttype, tid, balance, time)
         self.model = RandomForestRegressor(n_estimators=5, max_depth=4, random_state=42) # original version 10, 5
         self.history = []
-        self.min_history = 15 # 20
-        self.max_history = 50 # 100
+        self.min_history = 15
+        self.max_history = 50
         self.last_batch = None
-        self.training_frequency = 15 # 10
+        self.training_frequency = 15
 
+    # Limit the amount of historical data and retrain after every training_frequency data collection to speed up the efficiency
     def get_order(self, time, p_eq, q_eq, demand_curve, supply_curve, countdown, lob):
         if len(self.orders) < 1:
             self.active = False
@@ -482,7 +483,7 @@ class TraderRaForest(Trader):
 
         try:
             prediction = self.model.predict(np.array(market_data).reshape(1, -1))[0]
-            if otype == 'Bid':
+            if otype == 'Bid': # Ensure that the price limit is not exceeded
                 quote_price = min(int(prediction), limit_price)
             else:  # otype == 'Ask'
                 quote_price = max(int(prediction), limit_price)
@@ -497,12 +498,14 @@ class TraderRaForest(Trader):
     def respond(self, time, p_eq, q_eq, demand_curve, supply_curve, lob, trades, verbose):
         pass
 
+    # Collect the 4 key data as the feature
     def collect_market_data(self, time, p_eq, q_eq, demand_curve, supply_curve, lob):
         best_bid = max(demand_curve, key=lambda x: x[0])[0] if demand_curve else p_eq
         best_ask = min(supply_curve, key=lambda x: x[0])[0] if supply_curve else p_eq
         return [p_eq, q_eq, best_bid, best_ask]
 
 
+# GVWY is always powerful in Savidge’s results. I designed this algorithm in the hope that GVWY would be more adaptable
 class TraderMIX(Trader):
     def __init__(self, ttype, tid, balance, time):
         super().__init__(ttype, tid, balance, time)
@@ -522,6 +525,7 @@ class TraderMIX(Trader):
         self.last_strategy = None
 
 
+    # Check the market state
     def classify_market_state(self, order_imbalance, volatility):
         if abs(order_imbalance) < 0.1 and volatility < self.volatility_threshold / 2:
             return 'Stable'
@@ -530,6 +534,7 @@ class TraderMIX(Trader):
         else:
             return 'Normal'
 
+    # choose the strategy which in this state and based on the history performance
     def decide_strategy(self, market_state):
         state_performance = {}
         for strategy in self.strategies:
@@ -578,6 +583,8 @@ class TraderMIX(Trader):
             return (bid_volume - ask_volume) / total_volume
         return 0
 
+    # calculate the market volatility
+    # VWAP window is 10, so elder data will be deleted
     def calculate_volatility(self, p_eq):
         self.price_history.append(p_eq)
         if len(self.price_history) > self.vwap_window:
@@ -591,7 +598,7 @@ class TraderMIX(Trader):
 
     def ifb_strategy(self, limit_price, otype, order_imbalance):
         if abs(order_imbalance) > self.order_book_imbalance_threshold:
-            adjustment_factor = 1 + (0.1 * abs(order_imbalance))  # 动态调整因子
+            adjustment_factor = 1 + (0.1 * abs(order_imbalance))  # Dynamic factor of preference
             if order_imbalance > 0:  # Bullish signal
                 if otype == 'Bid':
                     return limit_price
@@ -605,6 +612,9 @@ class TraderMIX(Trader):
         else:
             return limit_price
 
+    # Adaptive strategy
+    # When the market is unstable (volatile), we use VWAP conservative, because the VWAP gives average price during the period
+    # By adjusting the alpha parameter, can change the algorithm's preference for historical and current prices
     def adaptive_strategy(self, p_eq, limit_price, otype, order_imbalance, volatility):
         vwap = np.mean(self.price_history) if self.price_history else p_eq
         alpha = 0.5  # Adaptive parameter
