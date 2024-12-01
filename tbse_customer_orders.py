@@ -3,11 +3,9 @@ Module containing code for production of customer orders
 """
 import random
 import sys
-
 import config
 from tbse_msg_classes import Order
 from tbse_sys_consts import TBSE_SYS_MAX_PRICE, TBSE_SYS_MIN_PRICE
-
 
 # pylint: disable=too-many-arguments,too-many-locals,too-many-statements
 def customer_orders(time, coid, traders, trader_stats, order_sched, pending, verbose):
@@ -123,6 +121,29 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
         new_order_price = sys_min_check(sys_max_check(new_order_price))
         return new_order_price
 
+    # Define the micro shocks
+    def generate_micro_shock_orders(t_name, order_type, base_price, time, current_coid):
+        shock_order_count = random.randint(config.micro_shock_order_count_min, config.micro_shock_order_count_max)   # as the config
+        shock_orders = []
+        for _ in range(shock_order_count):
+            # Generate orders that deviate slightly from the base price
+            shock_price = generate_shock_price(base_price, order_type)
+            shock_order = Order(t_name, order_type, shock_price, 1, time, current_coid, -3.14)
+            shock_orders.append(shock_order)
+            current_coid += 1
+        return shock_orders, current_coid
+
+    def generate_shock_price(base_price, order_type):
+        # Range of price changes: -0.5 per cent to +0.5 per cent
+        price_change_ratio = random.uniform(-0.005, 0.005)
+        shock_price = int(base_price * (1 + price_change_ratio))
+        if order_type == 'Bid':
+            # Ensure that the new price is not higher than the original price
+            shock_price = min(shock_price, base_price)
+        else:  # Ensure that the new price will not be lower than the original price
+            shock_price = max(shock_price, base_price)
+        return max(TBSE_SYS_MIN_PRICE, min(shock_price, TBSE_SYS_MAX_PRICE))
+
     # pylint: disable=too-many-branches
     def get_issue_times(n_traders, stepmode, interval, shuffle, fit_to_interval):
         """
@@ -204,6 +225,33 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
 
     cancellations = []
 
+    enable_market_shocks = config.enable_market_shocks
+    if enable_market_shocks:
+        # Initial state of Market Shocks
+        if not hasattr(customer_orders, 'macro_shock_active'):
+            customer_orders.macro_shock_active = False
+            customer_orders.macro_shock_remaining = 0
+            customer_orders.macro_shock_type = None
+            customer_orders.macro_shock_intensity = 0
+
+        # Checking for new macro shock triggers
+        if not customer_orders.macro_shock_active and random.random() < config.macro_shock_probability:
+            customer_orders.macro_shock_active = True
+            customer_orders.macro_shock_remaining = random.randint(config.macro_shock_duration_min,
+                                                                   config.macro_shock_duration_max)
+            customer_orders.macro_shock_type = random.choice(['bull', 'bear'])
+            customer_orders.macro_shock_intensity = random.uniform(config.macro_shock_intensity_min,
+                                                                   config.macro_shock_intensity_max)
+            # print(
+            #     f"Macro shock triggered at t={time}: {customer_orders.macro_shock_type}, intensity: {customer_orders.macro_shock_intensity:.2f}")
+
+        # Updating the state of macro shocks
+        if customer_orders.macro_shock_active:
+            customer_orders.macro_shock_remaining -= 1
+            if customer_orders.macro_shock_remaining <= 0:
+                customer_orders.macro_shock_active = False
+                # print(f"Macro shock ended at t={time}")
+
     if len(pending) < 1:
         # list of pending (to-be-issued) customer orders is empty, so generate a new one
         new_pending = []
@@ -216,9 +264,30 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
             issue_time = time + issue_times[t]
             t_name = f'B{str(t).zfill(2)}'
             order_price = get_order_price(t, sched, sched_end, n_buyers, mode, issue_time)
-            order = Order(t_name, order_type, order_price, 1, issue_time, coid, -3.14)
-            new_pending.append(order)
-            coid += 1
+            # check if market shocks are available
+            if enable_market_shocks:
+                # Macro shocks
+                if customer_orders.macro_shock_active:
+                    if customer_orders.macro_shock_type == 'bull':
+                        order_price = int(order_price * (1 + customer_orders.macro_shock_intensity))
+                    else:
+                        order_price = int(order_price * (1 - customer_orders.macro_shock_intensity))
+                    order_price = max(TBSE_SYS_MIN_PRICE, min(TBSE_SYS_MAX_PRICE, order_price))
+
+                # Normal Order
+                order = Order(t_name, order_type, order_price, 1, issue_time, coid, -3.14)
+                new_pending.append(order)
+                coid += 1
+
+                # Micro shock orders
+                if random.random() < config.micro_shock_probability:
+                    shock_orders, coid = generate_micro_shock_orders(t_name, order_type, order_price, issue_time, coid)
+                    new_pending.extend(shock_orders)
+            else:
+                # No shock
+                order = Order(t_name, order_type, order_price, 1, issue_time, coid, -3.14)
+                new_pending.append(order)
+                coid += 1
 
         # supply side (sellers)
         issue_times = get_issue_times(n_sellers, order_sched['timemode'], order_sched['interval'], shuffle_times, True)
@@ -228,9 +297,30 @@ def customer_orders(time, coid, traders, trader_stats, order_sched, pending, ver
             issue_time = time + issue_times[t]
             t_name = f'S{str(t).zfill(2)}'
             order_price = get_order_price(t, sched, sched_end, n_sellers, mode, issue_time)
-            order = Order(t_name, order_type, order_price, 1, issue_time, coid, -3.14)
-            new_pending.append(order)
-            coid += 1
+            # Check if market shocks are available
+            if enable_market_shocks:
+                # Macro shocks
+                if customer_orders.macro_shock_active:
+                    if customer_orders.macro_shock_type == 'bull':
+                        order_price = int(order_price * (1 + customer_orders.macro_shock_intensity))
+                    else:
+                        order_price = int(order_price * (1 - customer_orders.macro_shock_intensity))
+                    order_price = max(TBSE_SYS_MIN_PRICE, min(TBSE_SYS_MAX_PRICE, order_price))
+
+                # Normal orders
+                order = Order(t_name, order_type, order_price, 1, issue_time, coid, -3.14)
+                new_pending.append(order)
+                coid += 1
+
+                # micro shock
+                if random.random() < config.micro_shock_probability:
+                    shock_orders, coid = generate_micro_shock_orders(t_name, order_type, order_price, issue_time, coid)
+                    new_pending.extend(shock_orders)
+            else:
+                # No shocks
+                order = Order(t_name, order_type, order_price, 1, issue_time, coid, -3.14)
+                new_pending.append(order)
+                coid += 1
     else:
         # there are pending future orders: issue any whose timestamp is in the past
         new_pending = []
